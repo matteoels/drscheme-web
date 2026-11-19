@@ -19,7 +19,7 @@ const modLabel = (k) => (isMac ? '⌘' : 'Ctrl+') + k;
 const DEFAULT_PROGRAM = `#lang r7rs
 ;; Welcome to DrScheme Web!
 ;; Write your program here, then click "Run" (${modLabel('R')}).
-;; You can then try out your functions in the interactions window below.
+;; You can then try out your functions in the interactions window.
 
 (define (square x)
   (* x x))
@@ -47,7 +47,7 @@ function loadState() {
 }
 const saved = loadState();
 const prefs = Object.assign({
-  theme: 'dark', langMode: 'auto', layout: 'vertical', lineNumbers: true, fontSize: 14, split: 0.6,
+  theme: 'dark', langMode: 'auto', dock: 'right', lineNumbers: true, fontSize: 14, splitH: 0.56, splitV: 0.6,
   showDefs: true, showInter: true,
 }, saved ? saved.prefs : {});
 
@@ -666,8 +666,10 @@ const MENUS = [
     { label: 'Definitions Window', key: modLabel('D'), check: () => prefs.showDefs, action: () => togglePane('defs') },
     { label: 'Interactions Window', key: modLabel('E'), check: () => prefs.showInter, action: () => togglePane('inter') },
     { sep: true },
-    { label: 'Interactions Below', check: () => prefs.layout === 'vertical', action: () => setLayout('vertical') },
-    { label: 'Interactions on the Right', check: () => prefs.layout === 'horizontal', action: () => setLayout('horizontal') },
+    { label: 'Interactions on the Right', check: () => prefs.dock === 'right', action: () => setDock('right') },
+    { label: 'Interactions on the Left', check: () => prefs.dock === 'left', action: () => setDock('left') },
+    { label: 'Interactions Below', check: () => prefs.dock === 'bottom', action: () => setDock('bottom') },
+    { label: 'Interactions Above', check: () => prefs.dock === 'top', action: () => setDock('top') },
     { sep: true },
     { label: 'Line Numbers', check: () => prefs.lineNumbers, action: toggleLineNumbers },
     { label: 'Bigger Text', key: modLabel('+'), action: () => setFont(prefs.fontSize + 1) },
@@ -771,13 +773,26 @@ async function clip(kind) {
 // ======================================================================
 // View
 // ======================================================================
+// Where the interactions window sits. On narrow screens, left/right become top/bottom.
+const DOCKS = ['right', 'left', 'bottom', 'top'];
+const narrow = () => window.innerWidth < 700;
+function currentDock() {
+  const d = DOCKS.includes(prefs.dock) ? prefs.dock : 'right';
+  if (narrow()) return d === 'left' || d === 'top' ? 'top' : 'bottom';
+  return d;
+}
+const isHorizontal = (d) => d === 'left' || d === 'right';
+function splitKey() { return isHorizontal(currentDock()) ? 'splitH' : 'splitV'; }
+
 function applyLayout() {
+  const dock = currentDock();
   const panes = $('#panes');
-  panes.className = prefs.layout;
+  panes.className = `dock-${dock}`;
   $('#defs-wrap').hidden = !prefs.showDefs;
   $('#inter-wrap').hidden = !prefs.showInter;
   $('#splitter').hidden = !(prefs.showDefs && prefs.showInter);
-  $('#defs-wrap').style.flex = prefs.showInter ? `0 0 ${prefs.split * 100}%` : '1 1 auto';
+  $('#defs-wrap').style.flex = prefs.showInter ? `0 0 ${prefs[splitKey()] * 100}%` : '1 1 auto';
+  document.querySelectorAll('#dock-btns button').forEach((b) => b.classList.toggle('active', b.dataset.dock === dock));
   document.documentElement.dataset.theme = prefs.theme;
   const meta = document.querySelector('meta[name=theme-color]');
   if (meta) meta.content = prefs.theme === 'dark' ? '#14161b' : '#ffffff';
@@ -794,7 +809,7 @@ function togglePane(which) {
 }
 function toggleTheme() { prefs.theme = prefs.theme === 'dark' ? 'light' : 'dark'; applyLayout(); persist(); }
 function clearInteractions() { log.textContent = ''; lastOut = null; input.focus(); }
-function setLayout(l) { prefs.layout = l; applyLayout(); persist(); }
+function setDock(d) { prefs.dock = d; prefs.showInter = true; applyLayout(); persist(); }
 function toggleLineNumbers() { prefs.lineNumbers = !prefs.lineNumbers; defs.setOption('lineNumbers', prefs.lineNumbers); persist(); }
 function setFont(px) { prefs.fontSize = Math.max(9, Math.min(28, px)); applyLayout(); persist(); }
 
@@ -806,14 +821,56 @@ function setFont(px) { prefs.fontSize = Math.max(9, Math.min(28, px)); applyLayo
   sp.addEventListener('pointermove', (e) => {
     if (!dragging) return;
     const r = $('#panes').getBoundingClientRect();
-    const f = prefs.layout === 'vertical' ? (e.clientY - r.top) / r.height : (e.clientX - r.left) / r.width;
-    prefs.split = Math.max(0.12, Math.min(0.88, f));
-    $('#defs-wrap').style.flex = `0 0 ${prefs.split * 100}%`;
+    const dock = currentDock();
+    let f = isHorizontal(dock) ? (e.clientX - r.left) / r.width : (e.clientY - r.top) / r.height;
+    if (dock === 'left' || dock === 'top') f = 1 - f; // the definitions are on the other side
+    prefs[splitKey()] = Math.max(0.15, Math.min(0.85, f));
+    $('#defs-wrap').style.flex = `0 0 ${prefs[splitKey()] * 100}%`;
     defs.refresh();
   });
   const end = () => { if (dragging) { dragging = false; document.body.classList.remove('dragging'); persist(); defs.refresh(); input.refresh(); } };
   sp.addEventListener('pointerup', end);
   sp.addEventListener('pointercancel', end);
+})();
+
+// Drag the interactions header to an edge of the window to move it there.
+(function dockDrag() {
+  const head = $('#inter-head');
+  const overlay = $('#dock-overlay');
+  let start = null;
+  let target = null;
+  let dragging = false;
+  function zoneAt(x, y) {
+    const r = $('#panes').getBoundingClientRect();
+    const dist = { left: x - r.left, right: r.right - x, top: y - r.top, bottom: r.bottom - y };
+    const allowed = narrow() ? ['top', 'bottom'] : DOCKS;
+    return allowed.reduce((best, d) => (dist[d] / (isHorizontal(d) ? r.width : r.height) < dist[best] / (isHorizontal(best) ? r.width : r.height) ? d : best), allowed[0]);
+  }
+  head.addEventListener('pointerdown', (e) => {
+    if (e.target.closest('button') || e.button !== 0) return;
+    start = { x: e.clientX, y: e.clientY };
+    head.setPointerCapture(e.pointerId);
+  });
+  head.addEventListener('pointermove', (e) => {
+    if (!start) return;
+    if (!dragging) {
+      if (Math.hypot(e.clientX - start.x, e.clientY - start.y) < 8) return;
+      dragging = true;
+      overlay.hidden = false;
+      document.body.classList.add('docking');
+    }
+    target = zoneAt(e.clientX, e.clientY);
+    overlay.dataset.zone = target;
+  });
+  const end = () => {
+    if (dragging && target) setDock(target);
+    start = null; target = null; dragging = false;
+    overlay.hidden = true;
+    document.body.classList.remove('docking');
+  };
+  head.addEventListener('pointerup', end);
+  head.addEventListener('pointercancel', end);
+  document.querySelectorAll('#dock-btns button').forEach((b) => { b.onclick = () => setDock(b.dataset.dock); });
 })();
 
 // ======================================================================
@@ -1005,7 +1062,7 @@ window.addEventListener('beforeunload', () => {
     localStorage.setItem(KEY, JSON.stringify({ tabs: tabs.map((t) => ({ name: t.name, content: t.doc.getValue() })), active, prefs }));
   } catch { /* rien */ }
 });
-window.addEventListener('resize', () => { closeMenu(); defs.refresh(); });
+window.addEventListener('resize', () => { closeMenu(); applyLayout(); });
 
 // Exposed for automated tests
 window.drscheme = { run, stop, tabs, defs, input, newTab, switchTab, runInteraction, get busy() { return busy; } };

@@ -1,6 +1,6 @@
 # DrScheme Web
 
-A Scheme environment in your browser, inspired by DrRacket: a **definitions** window on top, an **interactions** window below, and a **Run** button. Dark mode is on by default, with a light theme one click away.
+A Scheme environment in your browser, inspired by DrRacket: a **definitions** window, an **interactions** window (on the right by default, and movable to any side), and a **Run** button. Dark mode is on by default, with a light theme one click away.
 
 **Live:** https://matteoels.github.io/drscheme-web/
 
@@ -18,6 +18,7 @@ Everything runs in the browser: there is no server and nothing to install. Your 
   - JDoodle-style paths (`/uploads/stack.rkt`) work too, since only the file name matters.
 - **`#lang racket`** (partial compatibility): `[ ]` brackets, `first`, `rest`, `add1`, `filter`, `foldl`, `range`, `printf`, `displayln`…
 - DrRacket-like syntax colouring and indentation, matching-expression shading, the `(define ...)` menu, find/replace, reindent (`Ctrl+I`) and λ (`Ctrl+\`).
+- Movable interactions window: drag its header to any edge, or use its left / top / bottom / right buttons.
 - Dark / light themes, and a layout that works on phones.
 - Open and download `.rkt` / `.scm` files.
 
