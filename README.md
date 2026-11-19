@@ -20,7 +20,7 @@ Everything runs in the browser: there is no server and nothing to install. Your 
 - DrRacket-like syntax colouring and indentation, matching-expression shading, the `(define ...)` menu, find/replace, reindent (`Ctrl+I`) and λ (`Ctrl+\`).
 - Movable interactions window: drag its header to any edge, or use its left / top / bottom / right buttons.
 - Dark / light themes, and a layout that works on phones.
-- Open and download `.rkt` / `.scm` files.
+- Open `.rkt` / `.scm` files (Open button, File > Open, or drag and drop; works with iCloud Drive on iPad) and download them.
 
 ## Limitations
 

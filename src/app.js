@@ -561,16 +561,30 @@ async function renameTab(i) {
 // ======================================================================
 // Files: open / save
 // ======================================================================
-$('#open-file').addEventListener('change', async (e) => {
-  const list = Array.from(e.target.files || []);
+async function openFiles(list) {
   for (const f of list) {
+    if (f.size > 5 * 1024 * 1024) { flash(`"${f.name}" is too big to open (over 5 MB).`, true); continue; }
     const content = await f.text();
+    if (content.includes('\u0000')) { flash(`"${f.name}" does not look like a text file.`, true); continue; }
     const existing = tabs.findIndex((t) => t.name === f.name);
     if (existing >= 0) { tabs[existing].doc.setValue(content); switchTab(existing); }
     else newTab(f.name, content);
+    defs.setCursor(0, 0);
+    flash(`Opened "${f.name}".`);
   }
+}
+$('#open-file').addEventListener('change', async (e) => {
+  await openFiles(Array.from(e.target.files || []));
   e.target.value = '';
-  defs.setCursor(0, 0);
+});
+// Drag and drop files (from the Finder, Explorer, or the Files app on iPad) onto the window.
+window.addEventListener('dragover', (e) => {
+  if (e.dataTransfer && Array.from(e.dataTransfer.types || []).includes('Files')) { e.preventDefault(); document.body.classList.add('file-over'); }
+});
+window.addEventListener('dragleave', (e) => { if (!e.relatedTarget) document.body.classList.remove('file-over'); });
+window.addEventListener('drop', (e) => {
+  document.body.classList.remove('file-over');
+  if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length) { e.preventDefault(); openFiles(Array.from(e.dataTransfer.files)); }
 });
 function openFile() { $('#open-file').click(); }
 function saveFile() {
@@ -1023,6 +1037,7 @@ $('#debug-btn').onclick = () => featureNotAvailable('Debug');
 $('#macro-btn').onclick = () => featureNotAvailable('Macro Stepper');
 $('#lang-btn').onclick = chooseLanguage;
 $('#theme-btn').onclick = toggleTheme;
+$('#open-btn').onclick = openFile;
 $('#clear-btn').onclick = clearInteractions;
 $('#define-btn').onmousedown = (e) => {
   e.preventDefault();

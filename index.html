@@ -49,6 +49,7 @@
 
   <div id="tabrow">
     <div id="tabs" role="tablist"></div>
+    <button id="open-btn" class="chip" title="Open a file (Ctrl+O)"><svg viewBox="0 0 16 16" class="chip-icon"><path d="M1.5 4.5v8a1 1 0 0 0 1 1h11a1 1 0 0 0 1-1v-6a1 1 0 0 0-1-1H8L6.5 3h-4a1 1 0 0 0-1 1.5z"/></svg>Open</button>
     <button id="define-btn" class="chip" title="Jump to a definition"><code>(define ...)</code> <span class="caret">▾</span></button>
   </div>
 
@@ -97,7 +98,8 @@
   </div>
 </div>
 
-<input type="file" id="open-file" accept=".rkt,.scm,.ss,.sld,.sls,.txt,text/plain" multiple hidden>
+<!-- No "accept" filter: iPhone/iPad Safari greys out unknown extensions such as .rkt -->
+<input type="file" id="open-file" multiple hidden>
 <script src="dist/app.js"></script>
 </body>
 </html>

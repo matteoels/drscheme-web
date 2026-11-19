@@ -351,3 +351,5 @@ kbd { font-family: var(--code-font); font-size: 11px; background: var(--surface-
 @media (max-width: 699px) {
   #dock-btns [data-dock="left"], #dock-btns [data-dock="right"] { display: none; }
 }
+body.file-over #panes { outline: 2px dashed var(--accent); outline-offset: -6px; border-radius: var(--radius); }
+.chip-icon { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linejoin: round; color: var(--muted); }
