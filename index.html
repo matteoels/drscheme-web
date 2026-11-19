@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, interactive-widget=resizes-content">
+<title>DrScheme Web</title>
+<meta name="description" content="Un environnement Scheme (R7RS) dans le navigateur, inspiré de DrRacket.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='15' fill='%23263238'/%3E%3Ctext x='16' y='23' font-size='20' text-anchor='middle' fill='%23ffca28' font-family='serif'%3E%CE%BB%3C/text%3E%3C/svg%3E">
+<link rel="stylesheet" href="dist/app.css">
+</head>
+<body>
+<div id="app">
+  <nav id="menubar" aria-label="Menus"><span class="logo" aria-hidden="true">λ</span></nav>
+
+  <div id="toolbar">
+    <div class="tb-left">
+      <button id="file-btn" class="pill" title="Fichier courant"><span id="file-btn-label">sans-titre.rkt</span> <span class="caret">▾</span></button>
+      <button id="define-btn" class="pill" title="Aller à une définition">(define ...) <span class="caret">▾</span></button>
+    </div>
+    <div class="tb-right">
+      <button id="check-btn" class="tool" title="Vérifier la syntaxe (Maj+Ctrl+K)">
+        <svg viewBox="0 0 24 24"><circle cx="10" cy="10" r="6.5" fill="#e8f1fb" stroke="#3b6aa0" stroke-width="2"/><path d="M15 15l6 6" stroke="#3b6aa0" stroke-width="3" stroke-linecap="round"/><path d="M7 10.5l2 2 4-4.5" stroke="#2e8b3e" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <span>Vérifier</span>
+      </button>
+      <button id="debug-btn" class="tool" title="Déboguer">
+        <svg viewBox="0 0 24 24"><ellipse cx="12" cy="14" rx="5" ry="6.5" fill="#6a4c93"/><circle cx="12" cy="6.5" r="3" fill="#6a4c93"/><path d="M4 9l4 2.5M20 9l-4 2.5M3.5 15H7M20.5 15H17M5 21l3.5-3M19 21l-3.5-3" stroke="#6a4c93" stroke-width="1.8" stroke-linecap="round"/><path d="M12 8.5v12" stroke="#fff" stroke-width="1"/></svg>
+        <span>Déboguer</span>
+      </button>
+      <button id="macro-btn" class="tool" title="Pas à pas des macros">
+        <svg viewBox="0 0 24 24"><path d="M3 20h18L12 4z" fill="#f4c542" stroke="#9a7a1c" stroke-width="1.5" stroke-linejoin="round"/><text x="12" y="18" font-size="8" text-anchor="middle" font-family="monospace" font-weight="bold" fill="#5a4410">#'</text></svg>
+        <span>Macros</span>
+      </button>
+      <span class="tb-sep"></span>
+      <button id="run-btn" class="tool run" title="Exécuter (Ctrl+R)">
+        <svg viewBox="0 0 24 24"><path d="M6 3.5v17l14-8.5z" fill="#3aa845" stroke="#1f7a2a" stroke-width="1.5" stroke-linejoin="round"/></svg>
+        <span>Exécuter</span>
+      </button>
+      <button id="stop-btn" class="tool stop" title="Arrêter (Ctrl+B)">
+        <svg viewBox="0 0 24 24"><rect x="5" y="5" width="14" height="14" rx="1.5" fill="#d9363e" stroke="#9c1c22" stroke-width="1.5"/></svg>
+        <span>Arrêter</span>
+      </button>
+    </div>
+  </div>
+
+  <div id="tabs" role="tablist"></div>
+
+  <div id="panes" class="vertical">
+    <div id="defs" aria-label="Fenêtre des définitions"></div>
+    <div id="splitter" title="Glisser pour redimensionner"></div>
+    <div id="inter-wrap" aria-label="Fenêtre d'interactions">
+      <div id="inter">
+        <div id="log"></div>
+        <div id="prompt-row"><span class="prompt">&gt;</span><div id="input"></div></div>
+      </div>
+    </div>
+  </div>
+
+  <div id="statusbar">
+    <button id="lang-btn" title="Choisir le langage (Ctrl+L)"><span id="lang-btn-label"></span> <span class="caret">▾</span></button>
+    <span id="status-msg"></span>
+    <span class="spacer"></span>
+    <span id="pos">1:0</span>
+    <span id="run-indicator" title="En attente"></span>
+  </div>
+</div>
+
+<div id="menu-popup" hidden></div>
+
+<div id="modal" hidden>
+  <div class="modal-box" role="dialog" aria-modal="true">
+    <div class="modal-title"></div>
+    <div class="modal-body"></div>
+    <div class="modal-buttons"></div>
+  </div>
+</div>
+
+<input type="file" id="open-file" accept=".rkt,.scm,.ss,.sld,.sls,.txt,text/plain" multiple hidden>
+<script src="dist/app.js"></script>
+</body>
+</html>
