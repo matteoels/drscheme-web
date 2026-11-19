@@ -1,39 +1,42 @@
 # DrScheme Web
 
-Un environnement Scheme dans le navigateur, inspiré de DrRacket : une fenêtre de **définitions** en haut, une fenêtre d'**interactions** en bas, et un bouton **Exécuter**.
+A Scheme environment in your browser, inspired by DrRacket: a **definitions** window on top, an **interactions** window below, and a **Run** button. Dark mode is on by default, with a light theme one click away.
 
-Le site fonctionne entièrement dans le navigateur. Il n'y a ni serveur ni installation, et tes fichiers sont sauvegardés automatiquement dans le navigateur.
+**Live:** https://matteoels.github.io/drscheme-web/
 
-## Fonctionnalités
+Everything runs in the browser: there is no server and nothing to install. Your files are saved automatically in the browser.
 
-- **R7RS** : `define-library`, `import`, `define-record-type`, `call/cc`, `guard`, `syntax-rules`, `parameterize`, récursion terminale…
-- **Fenêtre d'interactions** façon DrRacket : après « Exécuter », tes définitions restent disponibles pour les tester. Historique avec `Ctrl+↑` / `Ctrl+↓`.
-- **Erreurs en français**, avec l'expression fautive surlignée en rose dans le code.
-- **Bouton Arrêter** pour couper une boucle infinie (le programme tourne dans un Web Worker).
-- **Onglets / plusieurs fichiers** pour tes ADT :
-  - `(import (prefix (ma-lib) m:))` charge automatiquement l'onglet qui contient `(define-library (ma-lib) ...)` ;
-  - `(include "pile.rkt")` et, en `#lang racket`, `(require "pile.rkt")` ;
-  - les chemins façon JDoodle (`/uploads/pile.rkt`) marchent aussi, seul le nom du fichier compte.
-- **`#lang racket`** (compatibilité partielle) : crochets `[ ]`, `first`, `rest`, `add1`, `filter`, `foldl`, `range`, `printf`, `displayln`…
-- Coloration et indentation comme dans DrRacket, mise en évidence de l'expression entre parenthèses correspondantes, menu `(define ...)`, recherche/remplacement, réindentation (`Ctrl+I`), λ (`Ctrl+\`).
-- Ouvrir / télécharger des fichiers `.rkt`, `.scm`.
+## Features
 
-## Limites
+- **R7RS**: `define-library`, `import`, `define-record-type`, `call/cc`, `guard`, `syntax-rules`, `parameterize`, proper tail calls…
+- **DrRacket-style interactions**: after Run, your definitions stay available to try out. History with `Ctrl+↑` / `Ctrl+↓`.
+- **Clear error messages**, with the offending expression highlighted in the editor.
+- **Stop button** that kills infinite loops (the program runs in a Web Worker).
+- **Tabs / multiple files** for your ADTs:
+  - `(import (prefix (my-lib) m:))` automatically loads the tab that contains `(define-library (my-lib) ...)`;
+  - `(include "stack.rkt")`, and in `#lang racket`, `(require "stack.rkt")`;
+  - JDoodle-style paths (`/uploads/stack.rkt`) work too, since only the file name matters.
+- **`#lang racket`** (partial compatibility): `[ ]` brackets, `first`, `rest`, `add1`, `filter`, `foldl`, `range`, `printf`, `displayln`…
+- DrRacket-like syntax colouring and indentation, matching-expression shading, the `(define ...)` menu, find/replace, reindent (`Ctrl+I`) and λ (`Ctrl+\`).
+- Dark / light themes, and a layout that works on phones.
+- Open and download `.rkt` / `.scm` files.
 
-- Pas de fractions exactes (`(/ 1 3)` donne `0.333…`) ni de très grands entiers.
-- Plus lent que DrRacket : environ 30 000 appels de fonction par seconde.
-- Pas de débogueur ni de pas-à-pas des macros.
+## Limitations
 
-## Développement
+- No exact fractions (`(/ 1 3)` gives `0.333…`) and no big integers.
+- Slower than DrRacket: roughly 30,000 function calls per second.
+- No debugger or macro stepper.
+
+## Development
 
 ```sh
-npm install      # installe aussi le correctif du moteur (scripts/patch-cumalis.js)
-npm run build    # génère dist/
-python3 -m http.server   # puis ouvre http://localhost:8000
+npm install      # also applies the engine patches (scripts/patch-cumalis.js)
+npm run build    # builds dist/
+python3 -m http.server   # then open http://localhost:8000
 ```
 
-Le dossier `dist/` est versionné pour que GitHub Pages serve le site sans étape de build.
+`dist/` is committed so GitHub Pages can serve the site without a build step.
 
-Moteur : [Cumalis Lisp](https://github.com/trb-a/cumalis-lisp) (R7RS-small), avec trois petits correctifs appliqués par `scripts/patch-cumalis.js`. Éditeur : [CodeMirror 5](https://codemirror.net/5/).
+Engine: [Cumalis Lisp](https://github.com/trb-a/cumalis-lisp) (R7RS-small), with three small fixes applied by `scripts/patch-cumalis.js`. Editor: [CodeMirror 5](https://codemirror.net/5/).
 
-Projet indépendant, non affilié à Racket ni à DrRacket.
+Independent project, not affiliated with Racket or DrRacket.

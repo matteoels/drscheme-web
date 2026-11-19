@@ -17,41 +17,41 @@ const MOD = isMac ? 'Cmd' : 'Ctrl';
 const modLabel = (k) => (isMac ? '⌘' : 'Ctrl+') + k;
 
 const DEFAULT_PROGRAM = `#lang r7rs
-;; Bienvenue dans DrScheme Web !
-;; Écris ton programme ici, puis clique sur « Exécuter » (${modLabel('R')}).
-;; Tu peux ensuite tester tes fonctions dans la fenêtre d'interactions en bas.
+;; Welcome to DrScheme Web!
+;; Write your program here, then click "Run" (${modLabel('R')}).
+;; You can then try out your functions in the interactions window below.
 
-(define (carre x)
+(define (square x)
   (* x x))
 
-(define (factorielle n)
+(define (factorial n)
   (if (= n 0)
       1
-      (* n (factorielle (- n 1)))))
+      (* n (factorial (- n 1)))))
 
-(display "Bonjour !")
+(display "Hello!")
 (newline)
-(carre 12)
-(factorielle 10)
+(square 12)
+(factorial 10)
 `;
 
 // ======================================================================
-// État (sauvegardé dans le navigateur)
+// State (saved in the browser)
 // ======================================================================
 function loadState() {
   try {
     const s = JSON.parse(localStorage.getItem(KEY));
     if (s && Array.isArray(s.tabs) && s.tabs.length) return s;
-  } catch { /* état corrompu : on repart de zéro */ }
+  } catch { /* corrupted state: start from scratch */ }
   return null;
 }
 const saved = loadState();
 const prefs = Object.assign({
-  langMode: 'auto', layout: 'vertical', lineNumbers: true, fontSize: 14, split: 0.6,
+  theme: 'dark', langMode: 'auto', layout: 'vertical', lineNumbers: true, fontSize: 14, split: 0.6,
   showDefs: true, showInter: true,
 }, saved ? saved.prefs : {});
 
-const tabs = (saved ? saved.tabs : [{ name: 'sans-titre.rkt', content: DEFAULT_PROGRAM }]).map((t) => ({
+const tabs = (saved ? saved.tabs : [{ name: 'untitled.rkt', content: DEFAULT_PROGRAM }]).map((t) => ({
   name: t.name,
   doc: CodeMirror.Doc(t.content, 'scheme'),
   marks: [],
@@ -67,12 +67,12 @@ function persist() {
         tabs: tabs.map((t) => ({ name: t.name, content: t.doc.getValue() })),
         active, prefs,
       }));
-    } catch { /* stockage plein ou désactivé */ }
+    } catch { /* storage full or disabled */ }
   }, 300);
 }
 
 // ======================================================================
-// Éditeur des définitions
+// Definitions editor
 // ======================================================================
 const defs = CodeMirror($('#defs'), {
   value: tabs[active].doc,
@@ -93,7 +93,7 @@ const defs = CodeMirror($('#defs'), {
 });
 defs.swapDoc(tabs[active].doc);
 
-// Grise toute l'expression entre deux parenthèses correspondantes (comme DrRacket).
+// Shades the whole expression between matching parentheses (like DrRacket).
 function installSexpHighlight(cm) {
   let mark = null;
   cm.on('cursorActivity', () => {
@@ -119,7 +119,7 @@ defs.on('cursorActivity', () => {
 });
 
 // ======================================================================
-// Fenêtre d'interactions
+// Interactions window
 // ======================================================================
 const log = $('#log');
 const MAX_LOG = 300000;
@@ -162,7 +162,7 @@ function appendError(msg) {
   ensureNewline();
   const div = document.createElement('span');
   div.className = 'err';
-  div.innerHTML = '<svg class="bug" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="9" r="4.2" fill="#c33"/><circle cx="8" cy="4.2" r="2.2" fill="#c33"/><path d="M2 6l3 2M14 6l-3 2M2 13l3-2M14 13l-3-2" stroke="#c33" stroke-width="1.3"/></svg>';
+  div.innerHTML = '<svg class="bug" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="9" r="4.2"/><circle cx="8" cy="4.2" r="2.2"/><path d="M2 6l3 2M14 6l-3 2M2 13l3-2M14 13l-3-2" stroke="currentColor" stroke-width="1.3"/></svg>';
   div.appendChild(document.createTextNode(msg + '\n'));
   log.appendChild(div);
   lastOut = null;
@@ -202,7 +202,7 @@ function historyMove(d) {
 
 function isIncomplete(text) {
   try { readAll(text); return false; } catch (e) {
-    return e instanceof ReadError && /jamais fermé|non fermé|doit être suivi/.test(e.message);
+    return e instanceof ReadError && /unclosed|unterminated|must be followed/.test(e.message);
   }
 }
 
@@ -223,7 +223,7 @@ async function submitInteraction(cm) {
 }
 
 // ======================================================================
-// Session d'exécution (worker)
+// Execution session (worker)
 // ======================================================================
 class Session {
   constructor(lang) {
@@ -234,7 +234,7 @@ class Session {
     this.dead = false;
     this.worker.onmessage = (ev) => this.onMessage(ev.data);
     this.worker.onerror = (ev) => {
-      appendError('Erreur interne du moteur : ' + (ev.message || 'inconnue'));
+      appendError('Internal engine error: ' + (ev.message || 'unknown'));
       this.failAll();
     };
   }
@@ -245,7 +245,7 @@ class Session {
     if (p) { this.pending.delete(m.id); p(m); }
   }
   call(msg) {
-    if (this.dead) return Promise.resolve({ ok: false, error: 'session arrêtée', stopped: true });
+    if (this.dead) return Promise.resolve({ ok: false, error: 'session stopped', stopped: true });
     const id = this.nextId++;
     return new Promise((resolve) => {
       this.pending.set(id, resolve);
@@ -255,7 +255,7 @@ class Session {
   init(files) { return this.call({ type: 'init', lang: this.lang, files }); }
   eval(src, files) { return this.call({ type: 'eval', src, files }); }
   failAll() {
-    for (const p of this.pending.values()) p({ ok: false, error: 'session arrêtée', stopped: true });
+    for (const p of this.pending.values()) p({ ok: false, error: 'session stopped', stopped: true });
     this.pending.clear();
   }
   kill() {
@@ -282,14 +282,14 @@ function effectiveLang(text) {
   return l && /^racket|^typed\/racket/.test(l) ? 'racket' : 'r7rs';
 }
 function langLabel(lang) {
-  return lang === 'racket' ? 'racket (compatibilité partielle, moteur R7RS)' : 'r7rs';
+  return lang === 'racket' ? 'racket (partial compatibility, R7RS engine)' : 'r7rs';
 }
 
 function setBusy(b) {
   busy = b;
   document.body.classList.toggle('running', b);
-  $('#run-indicator').title = b ? 'Programme en cours d\'exécution' : 'En attente';
-  $('#status-msg').textContent = b ? 'En cours d\'exécution…' : '';
+  $('#run-indicator').title = b ? 'Program running' : 'Idle';
+  $('#status-msg').textContent = b ? 'Running…' : '';
   input.setOption('readOnly', b ? 'nocursor' : false);
 }
 
@@ -303,14 +303,14 @@ async function newSession(lang) {
 function printBanner(lang) {
   log.textContent = '';
   lastOut = null;
-  appendLog(`Bienvenue dans DrScheme Web, version ${VERSION} [cumalis].\n`, 'banner');
+  appendLog(`Welcome to DrScheme Web, version ${VERSION} [cumalis].\n`, 'banner');
   const span = document.createElement('span');
   span.className = 'banner';
-  span.innerHTML = `Langage : <b>${langLabel(lang)}</b> ; mémoire : celle du navigateur.\n`;
+  span.innerHTML = `Language: <b>${langLabel(lang)}</b>; memory: your browser's.\n`;
   log.appendChild(span);
 }
 
-// ---------- Exécution d'une forme de haut niveau ----------
+// ---------- Running a top-level form ----------
 function tabByName(name) {
   const base = String(name).split(/[\\/]/).pop();
   return tabs.find((t) => t.name === name) || tabs.find((t) => t.name === base) || null;
@@ -344,7 +344,7 @@ async function runForm(node, text, tab, ctx) {
       if (arg.type === 'str') {
         if (!(await loadFile(arg.value, ctx, 'require'))) return false;
       }
-      // (require racket/list) etc. : ignoré, ces fonctions sont fournies par la compatibilité Racket
+      // (require racket/list) etc.: ignored, those functions come from the Racket compatibility layer
     }
     return true;
   }
@@ -353,7 +353,7 @@ async function runForm(node, text, tab, ctx) {
   if (res.stopped || ctx.token !== runToken) return false;
 
   if (!res.ok && head === 'import') {
-    // Bibliothèque introuvable ? Si un onglet la définit, on le charge puis on réessaie.
+    // Library not found? If a tab defines it, load that tab and try again.
     const missing = importedLibraries(node).filter((n) => ctx.libIdx[n] && !ctx.autoLoaded.has(n));
     if (missing.length) {
       for (const n of missing) {
@@ -380,7 +380,7 @@ async function runForm(node, text, tab, ctx) {
 async function loadFile(name, ctx, who) {
   const tab = tabByName(name);
   if (!tab) {
-    appendError(`${who} : fichier introuvable « ${name} ». Ouvre-le d'abord dans un onglet (Fichier > Ouvrir…).`);
+    appendError(`${who}: cannot find file "${name}". Open it in a tab first (File > Open…).`);
     return false;
   }
   if (ctx.loading.has(tab.name)) return true;
@@ -449,7 +449,7 @@ function stop() {
   const lang = session ? session.lang : 'r7rs';
   if (session) session.kill();
   session = null;
-  appendError('Arrêt demandé par l\'utilisateur. L\'environnement a été réinitialisé : clique sur « Exécuter » pour recharger tes définitions.');
+  appendError('user break. The environment was reset: click "Run" to reload your definitions.');
   setBusy(false);
   newSession(lang);
 }
@@ -462,7 +462,7 @@ function receiveFileFromProgram(name, content) {
   persist();
 }
 
-// ---------- Marquage des erreurs dans l'éditeur ----------
+// ---------- Marking errors in the editor ----------
 function posLabel(tab, offset) {
   const p = tab.doc.posFromIndex(offset);
   return `${p.line + 1}:${p.ch}`;
@@ -480,7 +480,7 @@ function clearErrorMarks() {
 }
 
 // ======================================================================
-// Onglets
+// Tabs
 // ======================================================================
 function updateTabs() {
   const bar = $('#tabs');
@@ -488,15 +488,16 @@ function updateTabs() {
   tabs.forEach((t, i) => {
     const b = document.createElement('div');
     b.className = 'tab' + (i === active ? ' active' : '');
-    b.title = 'Double-clic pour renommer';
+    b.title = 'Double-click to rename';
+    b.insertAdjacentHTML('beforeend', '<svg class="file-icon" viewBox="0 0 16 16"><path d="M4 1.5h5.5L13 5v9.5H4z"/><path d="M9.5 1.5V5H13"/></svg>');
     const label = document.createElement('span');
-    label.textContent = t.name + (t.doc.isClean() ? '' : '');
+    label.textContent = t.name;
     b.appendChild(label);
     if (tabs.length > 1) {
       const x = document.createElement('button');
       x.className = 'tab-close';
       x.textContent = '×';
-      x.title = 'Fermer l\'onglet';
+      x.title = 'Close tab';
       x.onclick = (e) => { e.stopPropagation(); closeTab(i); };
       b.appendChild(x);
     }
@@ -507,10 +508,9 @@ function updateTabs() {
   const plus = document.createElement('button');
   plus.className = 'tab-new';
   plus.textContent = '+';
-  plus.title = `Nouvel onglet (${modLabel('T')})`;
+  plus.title = `New tab (${modLabel('T')})`;
   plus.onclick = () => newTab();
   bar.appendChild(plus);
-  $('#file-btn-label').textContent = tabs[active].name;
   document.title = `${tabs[active].name} - DrScheme Web`;
 }
 
@@ -533,7 +533,7 @@ function uniqueName(base) {
 }
 
 function newTab(name, content) {
-  tabs.push({ name: uniqueName(name || 'sans-titre.rkt'), doc: CodeMirror.Doc(content ?? '#lang r7rs\n', 'scheme'), marks: [] });
+  tabs.push({ name: uniqueName(name || 'untitled.rkt'), doc: CodeMirror.Doc(content ?? '#lang r7rs\n', 'scheme'), marks: [] });
   switchTab(tabs.length - 1);
   defs.setCursor(defs.lineCount(), 0);
 }
@@ -541,7 +541,7 @@ function newTab(name, content) {
 function closeTab(i) {
   if (tabs.length <= 1) return;
   const t = tabs[i];
-  if (t.doc.getValue().trim() && !confirm(`Fermer « ${t.name} » ? Son contenu sera perdu (pense à l'enregistrer).`)) return;
+  if (t.doc.getValue().trim() && !confirm(`Close "${t.name}"? Its contents will be lost (save it first if you need it).`)) return;
   tabs.splice(i, 1);
   if (active >= tabs.length) active = tabs.length - 1;
   else if (i < active) active--;
@@ -550,16 +550,16 @@ function closeTab(i) {
 
 async function renameTab(i) {
   const t = tabs[i];
-  const name = await promptModal('Renommer le fichier', 'Nouveau nom (par ex. pile.rkt) :', t.name);
+  const name = await promptModal('Rename file', 'New name (e.g. stack.rkt):', t.name);
   if (!name || name === t.name) return;
-  if (tabs.some((x) => x.name === name)) { await alertModal('Renommer', `Un onglet s'appelle déjà « ${name} ».`); return; }
+  if (tabs.some((x) => x.name === name)) { await alertModal('Rename', `A tab named "${name}" already exists.`); return; }
   t.name = name.trim();
   updateTabs();
   persist();
 }
 
 // ======================================================================
-// Fichiers : ouvrir / enregistrer
+// Files: open / save
 // ======================================================================
 $('#open-file').addEventListener('change', async (e) => {
   const list = Array.from(e.target.files || []);
@@ -583,21 +583,21 @@ function saveFile() {
   a.click();
   setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
   t.doc.markClean();
-  flash(`« ${t.name} » téléchargé.`);
+  flash(`Downloaded "${t.name}".`);
 }
 
 // ======================================================================
-// Vérification de la syntaxe
+// Syntax check
 // ======================================================================
 function checkSyntax() {
   const tab = tabs[active];
   clearErrorMarks();
   try {
     const forms = readAll(tab.doc.getValue());
-    flash(`Vérification de la syntaxe : OK (${forms.length} expression${forms.length > 1 ? 's' : ''} de haut niveau).`);
+    flash(`Check Syntax: OK (${forms.length} top-level expression${forms.length === 1 ? '' : 's'}).`);
   } catch (e) {
     markError(tab, e.pos, e.end);
-    flash(`Erreur de syntaxe ${posLabel(tab, e.pos)} : ${e.message}`, true);
+    flash(`Syntax error at ${posLabel(tab, e.pos)}: ${e.message}`, true);
   }
 }
 
@@ -634,75 +634,77 @@ function definitionsList() {
 }
 
 // ======================================================================
-// Menus déroulants
+// Drop-down menus
 // ======================================================================
 const MENUS = [
-  { label: 'Fichier', items: [
-    { label: 'Nouvel onglet', key: modLabel('T'), action: () => newTab() },
-    { label: 'Ouvrir…', key: modLabel('O'), action: openFile },
-    { label: 'Enregistrer (télécharger)', key: modLabel('S'), action: saveFile },
-    { label: 'Renommer…', action: () => renameTab(active) },
+  { label: 'File', items: [
+    { label: 'New Tab', key: modLabel('T'), action: () => newTab() },
+    { label: 'Open…', key: modLabel('O'), action: openFile },
+    { label: 'Save (download)', key: modLabel('S'), action: saveFile },
+    { label: 'Rename…', action: () => renameTab(active) },
     { sep: true },
-    { label: 'Fermer l\'onglet', key: modLabel('W'), action: () => closeTab(active), disabled: () => tabs.length <= 1 },
+    { label: 'Close Tab', key: modLabel('W'), action: () => closeTab(active), disabled: () => tabs.length <= 1 },
     { sep: true },
-    { label: 'Tout réinitialiser…', action: resetAll },
+    { label: 'Reset Everything…', action: resetAll },
   ] },
-  { label: 'Édition', items: [
-    { label: 'Annuler', key: modLabel('Z'), action: () => defs.undo() },
-    { label: 'Rétablir', key: modLabel('Y'), action: () => defs.redo() },
+  { label: 'Edit', items: [
+    { label: 'Undo', key: modLabel('Z'), action: () => defs.undo() },
+    { label: 'Redo', key: modLabel('Y'), action: () => defs.redo() },
     { sep: true },
-    { label: 'Couper', key: modLabel('X'), action: () => clip('cut') },
-    { label: 'Copier', key: modLabel('C'), action: () => clip('copy') },
-    { label: 'Coller', key: modLabel('V'), action: () => clip('paste') },
-    { label: 'Tout sélectionner', key: modLabel('A'), action: () => { defs.focus(); defs.execCommand('selectAll'); } },
+    { label: 'Cut', key: modLabel('X'), action: () => clip('cut') },
+    { label: 'Copy', key: modLabel('C'), action: () => clip('copy') },
+    { label: 'Paste', key: modLabel('V'), action: () => clip('paste') },
+    { label: 'Select All', key: modLabel('A'), action: () => { defs.focus(); defs.execCommand('selectAll'); } },
     { sep: true },
-    { label: 'Rechercher…', key: modLabel('F'), action: () => { defs.focus(); defs.execCommand('find'); } },
-    { label: 'Remplacer…', key: isMac ? '⌥⌘F' : 'Maj+Ctrl+F', action: () => { defs.focus(); defs.execCommand('replace'); } },
-    { label: 'Aller à la ligne…', key: modLabel('G'), action: () => { defs.focus(); defs.execCommand('jumpToLine'); } },
+    { label: 'Find…', key: modLabel('F'), action: () => { defs.focus(); defs.execCommand('find'); } },
+    { label: 'Replace…', key: isMac ? '⌥⌘F' : 'Shift+Ctrl+F', action: () => { defs.focus(); defs.execCommand('replace'); } },
+    { label: 'Go to Line…', key: modLabel('G'), action: () => { defs.focus(); defs.execCommand('jumpToLine'); } },
   ] },
-  { label: 'Affichage', items: [
-    { label: 'Fenêtre des définitions', key: modLabel('D'), check: () => prefs.showDefs, action: () => togglePane('defs') },
-    { label: 'Fenêtre d\'interactions', key: modLabel('E'), check: () => prefs.showInter, action: () => togglePane('inter') },
+  { label: 'View', items: [
+    { label: 'Dark Mode', check: () => prefs.theme === 'dark', action: toggleTheme },
     { sep: true },
-    { label: 'Interactions en bas', check: () => prefs.layout === 'vertical', action: () => setLayout('vertical') },
-    { label: 'Interactions à droite', check: () => prefs.layout === 'horizontal', action: () => setLayout('horizontal') },
+    { label: 'Definitions Window', key: modLabel('D'), check: () => prefs.showDefs, action: () => togglePane('defs') },
+    { label: 'Interactions Window', key: modLabel('E'), check: () => prefs.showInter, action: () => togglePane('inter') },
     { sep: true },
-    { label: 'Numéros de ligne', check: () => prefs.lineNumbers, action: toggleLineNumbers },
-    { label: 'Agrandir le texte', key: modLabel('+'), action: () => setFont(prefs.fontSize + 1) },
-    { label: 'Réduire le texte', key: modLabel('-'), action: () => setFont(prefs.fontSize - 1) },
+    { label: 'Interactions Below', check: () => prefs.layout === 'vertical', action: () => setLayout('vertical') },
+    { label: 'Interactions on the Right', check: () => prefs.layout === 'horizontal', action: () => setLayout('horizontal') },
+    { sep: true },
+    { label: 'Line Numbers', check: () => prefs.lineNumbers, action: toggleLineNumbers },
+    { label: 'Bigger Text', key: modLabel('+'), action: () => setFont(prefs.fontSize + 1) },
+    { label: 'Smaller Text', key: modLabel('-'), action: () => setFont(prefs.fontSize - 1) },
   ] },
-  { label: 'Langage', items: [
-    { label: 'Choisir le langage…', key: modLabel('L'), action: chooseLanguage },
+  { label: 'Language', items: [
+    { label: 'Choose Language…', key: modLabel('L'), action: chooseLanguage },
     { sep: true },
-    { label: 'Insérer #lang r7rs', action: () => insertAtTop('#lang r7rs\n') },
-    { label: 'Insérer #lang racket', action: () => insertAtTop('#lang racket\n') },
+    { label: 'Insert #lang r7rs', action: () => insertAtTop('#lang r7rs\n') },
+    { label: 'Insert #lang racket', action: () => insertAtTop('#lang racket\n') },
   ] },
   { label: 'Scheme', items: [
-    { label: 'Exécuter', key: modLabel('R'), action: run },
-    { label: 'Arrêter', key: modLabel('B'), action: stop, disabled: () => !busy },
+    { label: 'Run', key: modLabel('R'), action: run },
+    { label: 'Stop', key: modLabel('B'), action: stop, disabled: () => !busy },
     { sep: true },
-    { label: 'Vérifier la syntaxe', key: isMac ? '⇧⌘K' : 'Maj+Ctrl+K', action: checkSyntax },
-    { label: 'Réindenter tout', key: modLabel('I'), action: reindentAll },
-    { label: 'Commenter / décommenter', key: modLabel(';'), action: () => { defs.focus(); defs.toggleComment(); } },
+    { label: 'Check Syntax', key: isMac ? '⇧⌘K' : 'Shift+Ctrl+K', action: checkSyntax },
+    { label: 'Reindent All', key: modLabel('I'), action: reindentAll },
+    { label: 'Comment / Uncomment', key: modLabel(';'), action: () => { defs.focus(); defs.toggleComment(); } },
     { sep: true },
-    { label: 'Vider les interactions', action: () => { log.textContent = ''; lastOut = null; } },
+    { label: 'Clear Interactions', action: clearInteractions },
   ] },
-  { label: 'Insertion', items: [
-    { label: 'Insérer λ', key: modLabel('\\'), action: () => { defs.focus(); defs.replaceSelection('λ'); } },
-    { label: 'Insérer un modèle define-library', action: insertLibraryTemplate },
-    { label: 'Insérer un modèle define-record-type', action: insertRecordTemplate },
+  { label: 'Insert', items: [
+    { label: 'Insert λ', key: modLabel('\\'), action: () => { defs.focus(); defs.replaceSelection('λ'); } },
+    { label: 'Insert define-library Template', action: insertLibraryTemplate },
+    { label: 'Insert define-record-type Template', action: insertRecordTemplate },
   ] },
-  { label: 'Onglets', items: () => [
-    { label: 'Onglet suivant', key: modLabel('PgDn'), action: () => switchTab((active + 1) % tabs.length) },
-    { label: 'Onglet précédent', key: modLabel('PgUp'), action: () => switchTab((active - 1 + tabs.length) % tabs.length) },
+  { label: 'Tabs', items: () => [
+    { label: 'Next Tab', key: modLabel('PgDn'), action: () => switchTab((active + 1) % tabs.length) },
+    { label: 'Previous Tab', key: modLabel('PgUp'), action: () => switchTab((active - 1 + tabs.length) % tabs.length) },
     { sep: true },
     ...tabs.map((t, i) => ({ label: t.name, check: () => i === active, action: () => switchTab(i) })),
   ] },
-  { label: 'Aide', items: [
-    { label: 'Raccourcis clavier', action: showShortcuts },
-    { label: 'Charger un ADT depuis un autre fichier', action: showAdtHelp },
+  { label: 'Help', items: [
+    { label: 'Keyboard Shortcuts', action: showShortcuts },
+    { label: 'Using an ADT from Another File', action: showAdtHelp },
     { sep: true },
-    { label: 'À propos de DrScheme Web', action: showAbout },
+    { label: 'About DrScheme Web', action: showAbout },
   ] },
 ];
 
@@ -750,7 +752,7 @@ function closeMenu() {
   openMenuEl = null;
 }
 document.addEventListener('mousedown', (e) => {
-  if (openMenuEl && !e.target.closest('#menu-popup') && !e.target.closest('.menu-title') && !e.target.closest('.pill')) closeMenu();
+  if (openMenuEl && !e.target.closest('#menu-popup') && !e.target.closest('.menu-title') && !e.target.closest('.chip')) closeMenu();
 });
 
 async function clip(kind) {
@@ -762,20 +764,23 @@ async function clip(kind) {
     await navigator.clipboard.writeText(sel);
     if (kind === 'cut') defs.replaceSelection('');
   } catch {
-    flash(`Le navigateur bloque le presse-papiers : utilise ${modLabel(kind === 'paste' ? 'V' : kind === 'cut' ? 'X' : 'C')}.`, true);
+    flash(`The browser blocked the clipboard: use ${modLabel(kind === 'paste' ? 'V' : kind === 'cut' ? 'X' : 'C')} instead.`, true);
   }
 }
 
 // ======================================================================
-// Affichage
+// View
 // ======================================================================
 function applyLayout() {
   const panes = $('#panes');
   panes.className = prefs.layout;
-  $('#defs').hidden = !prefs.showDefs;
+  $('#defs-wrap').hidden = !prefs.showDefs;
   $('#inter-wrap').hidden = !prefs.showInter;
   $('#splitter').hidden = !(prefs.showDefs && prefs.showInter);
-  $('#defs').style.flex = prefs.showInter ? `0 0 ${prefs.split * 100}%` : '1 1 auto';
+  $('#defs-wrap').style.flex = prefs.showInter ? `0 0 ${prefs.split * 100}%` : '1 1 auto';
+  document.documentElement.dataset.theme = prefs.theme;
+  const meta = document.querySelector('meta[name=theme-color]');
+  if (meta) meta.content = prefs.theme === 'dark' ? '#14161b' : '#ffffff';
   document.documentElement.style.setProperty('--code-size', prefs.fontSize + 'px');
   defs.refresh();
   input.refresh();
@@ -787,11 +792,13 @@ function togglePane(which) {
   applyLayout();
   persist();
 }
+function toggleTheme() { prefs.theme = prefs.theme === 'dark' ? 'light' : 'dark'; applyLayout(); persist(); }
+function clearInteractions() { log.textContent = ''; lastOut = null; input.focus(); }
 function setLayout(l) { prefs.layout = l; applyLayout(); persist(); }
 function toggleLineNumbers() { prefs.lineNumbers = !prefs.lineNumbers; defs.setOption('lineNumbers', prefs.lineNumbers); persist(); }
 function setFont(px) { prefs.fontSize = Math.max(9, Math.min(28, px)); applyLayout(); persist(); }
 
-// Séparateur déplaçable entre définitions et interactions
+// Draggable splitter between definitions and interactions
 (function splitter() {
   const sp = $('#splitter');
   let dragging = false;
@@ -801,7 +808,7 @@ function setFont(px) { prefs.fontSize = Math.max(9, Math.min(28, px)); applyLayo
     const r = $('#panes').getBoundingClientRect();
     const f = prefs.layout === 'vertical' ? (e.clientY - r.top) / r.height : (e.clientX - r.left) / r.width;
     prefs.split = Math.max(0.12, Math.min(0.88, f));
-    $('#defs').style.flex = `0 0 ${prefs.split * 100}%`;
+    $('#defs-wrap').style.flex = `0 0 ${prefs.split * 100}%`;
     defs.refresh();
   });
   const end = () => { if (dragging) { dragging = false; document.body.classList.remove('dragging'); persist(); defs.refresh(); input.refresh(); } };
@@ -810,28 +817,28 @@ function setFont(px) { prefs.fontSize = Math.max(9, Math.min(28, px)); applyLayo
 })();
 
 // ======================================================================
-// Langage
+// Language
 // ======================================================================
 function updateLangButton() {
-  const labels = { auto: 'Déterminer le langage à partir de la source', r7rs: 'R7RS', racket: 'Racket (compatibilité partielle)' };
+  const labels = { auto: 'Determine language from source', r7rs: 'R7RS', racket: 'Racket (partial compatibility)' };
   $('#lang-btn-label').textContent = labels[prefs.langMode];
 }
 async function chooseLanguage() {
   const body = document.createElement('div');
   body.innerHTML = `
-    <label class="radio"><input type="radio" name="lang" value="auto"> <b>Déterminer le langage à partir de la source</b>
-      <small>Utilise la ligne <code>#lang</code> en haut du fichier (<code>#lang r7rs</code> ou <code>#lang racket</code>). Sans <code>#lang</code> : R7RS.</small></label>
-    <label class="radio"><input type="radio" name="lang" value="r7rs"> <b>R7RS</b>
-      <small>Scheme standard : <code>define-library</code>, <code>import</code>, <code>define-record-type</code>… Les bibliothèques <code>(scheme base)</code>, <code>(scheme write)</code>, etc. sont importées d'office.</small></label>
-    <label class="radio"><input type="radio" name="lang" value="racket"> <b>Racket (compatibilité partielle)</b>
-      <small>Ajoute <code>first</code>, <code>rest</code>, <code>add1</code>, <code>filter</code>, <code>foldl</code>, <code>printf</code>, <code>displayln</code>… et ignore <code>provide</code>. Le moteur reste R7RS : tout Racket n'est pas disponible.</small></label>`;
+    <label class="radio"><input type="radio" name="lang" value="auto"><span><b>Determine language from source</b>
+      <small>Uses the <code>#lang</code> line at the top of the file (<code>#lang r7rs</code> or <code>#lang racket</code>). Without <code>#lang</code>: R7RS.</small></span></label>
+    <label class="radio"><input type="radio" name="lang" value="r7rs"><span><b>R7RS</b>
+      <small>Standard Scheme: <code>define-library</code>, <code>import</code>, <code>define-record-type</code>… <code>(scheme base)</code>, <code>(scheme write)</code>, etc. are imported automatically.</small></span></label>
+    <label class="radio"><input type="radio" name="lang" value="racket"><span><b>Racket (partial compatibility)</b>
+      <small>Adds <code>first</code>, <code>rest</code>, <code>add1</code>, <code>filter</code>, <code>foldl</code>, <code>printf</code>, <code>displayln</code>… and ignores <code>provide</code>. The engine is still R7RS, so not all of Racket is available.</small></span></label>`;
   body.querySelector(`input[value="${prefs.langMode}"]`).checked = true;
-  const ok = await modal('Choisir le langage', body, [{ label: 'Annuler', value: false }, { label: 'OK', value: true, primary: true }]);
+  const ok = await modal('Choose Language', body, [{ label: 'Cancel', value: false }, { label: 'OK', value: true, primary: true }]);
   if (!ok) return;
   prefs.langMode = body.querySelector('input[name=lang]:checked').value;
   updateLangButton();
   persist();
-  flash('Langage modifié : clique sur « Exécuter » pour l\'appliquer.');
+  flash('Language changed: click "Run" to apply it.');
 }
 function insertAtTop(line) {
   const d = tabs[active].doc;
@@ -841,11 +848,11 @@ function insertAtTop(line) {
 }
 function insertLibraryTemplate() {
   defs.focus();
-  defs.replaceSelection(`(define-library (ma-bibliotheque)
-  (export ma-fonction)
+  defs.replaceSelection(`(define-library (my-library)
+  (export my-function)
   (import (scheme base))
   (begin
-    (define (ma-fonction x)
+    (define (my-function x)
       x)))
 `);
 }
@@ -860,7 +867,7 @@ function insertRecordTemplate() {
 }
 
 // ======================================================================
-// Fenêtres modales
+// Modal dialogs
 // ======================================================================
 function modal(title, body, buttons) {
   return new Promise((resolve) => {
@@ -900,15 +907,15 @@ async function promptModal(title, label, value) {
   div.querySelector('span').textContent = label;
   const inp = div.querySelector('input');
   inp.value = value || '';
-  const ok = await modal(title, div, [{ label: 'Annuler', value: false }, { label: 'OK', value: true, primary: true }]);
+  const ok = await modal(title, div, [{ label: 'Cancel', value: false }, { label: 'OK', value: true, primary: true }]);
   return ok ? inp.value : null;
 }
 function featureNotAvailable(name) {
-  alertModal(name, `« ${name} » n'existe pas encore dans la version web. Utilise « Exécuter » et la fenêtre d'interactions pour tester ton code pas à pas.`);
+  alertModal(name, `${name} is not available in the web version yet. Use Run and the interactions window to test your code step by step.`);
 }
 async function resetAll() {
-  const ok = await modal('Tout réinitialiser', '<p>Supprimer tous les onglets et préférences enregistrés dans ce navigateur ? Télécharge d\'abord les fichiers que tu veux garder.</p>',
-    [{ label: 'Annuler', value: false }, { label: 'Tout supprimer', value: true, primary: true }]);
+  const ok = await modal('Reset Everything', '<p>Delete all tabs and preferences saved in this browser? Download any files you want to keep first.</p>',
+    [{ label: 'Cancel', value: false }, { label: 'Delete Everything', value: true, primary: true }]);
   if (!ok) return;
   localStorage.removeItem(KEY);
   clearTimeout(saveTimer);
@@ -917,65 +924,57 @@ async function resetAll() {
 }
 function showShortcuts() {
   const rows = [
-    ['Exécuter', modLabel('R')], ['Arrêter', modLabel('B')], ['Vérifier la syntaxe', isMac ? '⇧⌘K' : 'Maj+Ctrl+K'],
-    ['Nouvel onglet', modLabel('T')], ['Ouvrir', modLabel('O')], ['Enregistrer (télécharger)', modLabel('S')], ['Fermer l\'onglet', modLabel('W')],
-    ['Onglet suivant / précédent', `${modLabel('PgDn')} / ${modLabel('PgUp')}`],
-    ['Réindenter la ligne / sélection', 'Tab'], ['Réindenter tout', modLabel('I')], ['Commenter / décommenter', modLabel(';')],
-    ['Insérer λ', modLabel('\\')], ['Afficher/masquer définitions', modLabel('D')], ['Afficher/masquer interactions', modLabel('E')],
-    ['Interactions : évaluer', 'Entrée'], ['Interactions : nouvelle ligne', 'Maj+Entrée'],
-    ['Interactions : historique', `${modLabel('↑')} / ${modLabel('↓')}`],
+    ['Run', modLabel('R')], ['Stop', modLabel('B')], ['Check Syntax', isMac ? '⇧⌘K' : 'Shift+Ctrl+K'],
+    ['New tab', modLabel('T')], ['Open', modLabel('O')], ['Save (download)', modLabel('S')], ['Close tab', modLabel('W')],
+    ['Next / previous tab', `${modLabel('PgDn')} / ${modLabel('PgUp')}`],
+    ['Reindent line / selection', 'Tab'], ['Reindent all', modLabel('I')], ['Comment / uncomment', modLabel(';')],
+    ['Insert λ', modLabel('\\')], ['Show/hide definitions', modLabel('D')], ['Show/hide interactions', modLabel('E')],
+    ['Interactions: evaluate', 'Enter'], ['Interactions: new line', 'Shift+Enter'],
+    ['Interactions: history', `${modLabel('↑')} / ${modLabel('↓')}`],
   ];
-  modal('Raccourcis clavier', `<table class="keys">${rows.map(([a, b]) => `<tr><td>${a}</td><td><kbd>${b}</kbd></td></tr>`).join('')}</table>`,
-    [{ label: 'Fermer', value: true, primary: true }]);
+  modal('Keyboard Shortcuts', `<table class="keys">${rows.map(([a, b]) => `<tr><td>${a}</td><td><kbd>${b}</kbd></td></tr>`).join('')}</table>`,
+    [{ label: 'Close', value: true, primary: true }]);
 }
 function showAdtHelp() {
-  modal('Charger un ADT depuis un autre fichier', `
-    <p>Ouvre ou crée le fichier de ton ADT dans un <b>autre onglet</b> (par ex. <code>pile.rkt</code>), puis, dans ton programme :</p>
-    <p><b>Si l'ADT est un <code>define-library</code></b>, importe-le simplement par son nom : l'onglet qui le définit est chargé automatiquement.</p>
-    <pre>(import (prefix (pile) p:))</pre>
-    <p><b>Si ce sont de simples <code>define</code></b> :</p>
-    <pre>(include "pile.rkt")</pre>
-    <p>En <code>#lang racket</code>, <code>(require "pile.rkt")</code> marche aussi. Les chemins comme <code>/uploads/pile.rkt</code> (JDoodle) sont acceptés : seul le nom du fichier compte.</p>`,
-  [{ label: 'Fermer', value: true, primary: true }]);
+  modal('Using an ADT from Another File', `
+    <p>Open or create your ADT's file in <b>another tab</b> (e.g. <code>stack.rkt</code>), then in your program:</p>
+    <p><b>If the ADT is a <code>define-library</code></b>, just import it by name: the tab that defines it is loaded automatically.</p>
+    <pre>(import (prefix (stack) s:))</pre>
+    <p><b>If it is plain <code>define</code>s:</b></p>
+    <pre>(include "stack.rkt")</pre>
+    <p>In <code>#lang racket</code>, <code>(require "stack.rkt")</code> works too. Paths like <code>/uploads/stack.rkt</code> (JDoodle) are accepted: only the file name matters.</p>`,
+  [{ label: 'Close', value: true, primary: true }]);
 }
 function showAbout() {
-  modal('À propos', `
+  modal('About', `
     <div class="about"><div class="logo big">λ</div>
-    <p><b>DrScheme Web ${VERSION}</b><br>Un environnement Scheme dans le navigateur, inspiré de DrRacket.</p>
-    <p>Moteur : <a href="https://github.com/trb-a/cumalis-lisp" target="_blank" rel="noopener">Cumalis Lisp</a> (R7RS-small).<br>
-    Éditeur : <a href="https://codemirror.net/5/" target="_blank" rel="noopener">CodeMirror 5</a>.</p>
-    <p class="muted">Projet indépendant, non affilié à Racket ni à DrRacket.<br>
-    Limites : pas de fractions exactes (1/3 → 0.333…), pas de grands entiers, et l'exécution est plus lente que dans DrRacket.</p></div>`,
-  [{ label: 'Fermer', value: true, primary: true }]);
+    <p><b>DrScheme Web ${VERSION}</b><br>A Scheme environment in your browser, inspired by DrRacket.</p>
+    <p>Engine: <a href="https://github.com/trb-a/cumalis-lisp" target="_blank" rel="noopener">Cumalis Lisp</a> (R7RS-small).<br>
+    Editor: <a href="https://codemirror.net/5/" target="_blank" rel="noopener">CodeMirror 5</a>.</p>
+    <p class="muted">Independent project, not affiliated with Racket or DrRacket.<br>
+    Limitations: no exact fractions (1/3 → 0.333…), no big integers, and code runs slower than in DrRacket.</p></div>`,
+  [{ label: 'Close', value: true, primary: true }]);
 }
 
 // ======================================================================
-// Barre d'outils, raccourcis, démarrage
+// Toolbar, shortcuts, startup
 // ======================================================================
 $('#run-btn').onclick = run;
 $('#stop-btn').onclick = stop;
 $('#check-btn').onclick = checkSyntax;
-$('#debug-btn').onclick = () => featureNotAvailable('Déboguer');
-$('#macro-btn').onclick = () => featureNotAvailable('Pas à pas des macros');
+$('#debug-btn').onclick = () => featureNotAvailable('Debug');
+$('#macro-btn').onclick = () => featureNotAvailable('Macro Stepper');
 $('#lang-btn').onclick = chooseLanguage;
-$('#file-btn').onmousedown = (e) => {
-  e.preventDefault();
-  const b = e.currentTarget;
-  if (openMenuEl === b) return closeMenu();
-  openMenu(b, [
-    { label: 'Renommer…', action: () => renameTab(active) },
-    { label: 'Enregistrer (télécharger)', key: modLabel('S'), action: saveFile },
-    { label: 'Ouvrir…', key: modLabel('O'), action: openFile },
-  ]);
-};
+$('#theme-btn').onclick = toggleTheme;
+$('#clear-btn').onclick = clearInteractions;
 $('#define-btn').onmousedown = (e) => {
   e.preventDefault();
   const b = e.currentTarget;
   if (openMenuEl === b) return closeMenu();
   const list = definitionsList();
   let items;
-  if (list === null) items = [{ label: 'Erreur de syntaxe dans le fichier', action: checkSyntax }];
-  else if (!list.length) items = [{ label: '(aucune définition)', action: () => {}, disabled: () => true }];
+  if (list === null) items = [{ label: 'Syntax error in this file', action: checkSyntax }];
+  else if (!list.length) items = [{ label: '(no definitions)', action: () => {}, disabled: () => true }];
   else items = list.map((d) => ({ label: d.name, key: d.kind === 'define' ? '' : d.kind, action: () => {
     const p = tabs[active].doc.posFromIndex(d.start);
     defs.focus();
@@ -1008,7 +1007,7 @@ window.addEventListener('beforeunload', () => {
 });
 window.addEventListener('resize', () => { closeMenu(); defs.refresh(); });
 
-// Exposé pour les tests automatisés
+// Exposed for automated tests
 window.drscheme = { run, stop, tabs, defs, input, newTab, switchTab, runInteraction, get busy() { return busy; } };
 
 buildMenubar();

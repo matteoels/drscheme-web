@@ -1,7 +1,7 @@
 {
   "name": "drscheme-web",
   "version": "1.0.0",
-  "description": "Un environnement Scheme (R7RS) dans le navigateur, inspiré de DrRacket",
+  "description": "A Scheme (R7RS) environment in the browser, inspired by DrRacket",
   "scripts": {
     "build": "esbuild src/app.js --bundle --minify --outfile=dist/app.js --loader:.css=css && esbuild src/style.css --bundle --minify --outfile=dist/app.css && esbuild src/worker.js --bundle --minify --format=iife --outfile=dist/worker.js",
     "prebuild": "node scripts/patch-cumalis.js",

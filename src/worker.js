@@ -1,5 +1,5 @@
-// Worker : fait tourner l'interpréteur R7RS (Cumalis Lisp) hors de la page,
-// pour que le bouton « Arrêter » puisse couper une boucle infinie.
+// Worker: runs the R7RS interpreter (Cumalis Lisp) off the main page,
+// so the Stop button can kill an infinite loop.
 import { Buffer } from 'buffer';
 self.Buffer = Buffer;
 self.process = self.process || { env: {}, argv: [] };
@@ -11,7 +11,7 @@ let itrp = null;
 let susp = null;
 let files = {};
 
-// ---------- Sortie standard (display, write, newline...) ----------
+// ---------- Standard output (display, write, newline...) ----------
 let outBuf = '';
 let lastFlush = 0;
 function flushOut() {
@@ -23,7 +23,7 @@ function writeOut(s) {
   if (outBuf.length > 8192 || Date.now() - lastFlush > 60) flushOut();
 }
 
-// ---------- Faux système de fichiers : les onglets ouverts sont les fichiers ----------
+// ---------- Fake file system: the open tabs are the files ----------
 function resolve(path) {
   if (Object.prototype.hasOwnProperty.call(files, path)) return path;
   const base = String(path).split(/[\\/]/).pop();
@@ -34,17 +34,17 @@ const fds = new Map();
 let nextFd = 10;
 const fakeFs = {
   existsSync: (p) => resolve(p) !== null,
-  // utilisé par include et load : on enlève la ligne #lang et on convertit les crochets
+  // used by include and load: strip the #lang line and convert brackets
   readFileSync: (p) => {
     const k = resolve(p);
-    if (k === null) throw new Error(`fichier introuvable : ${p} (ouvre-le dans un onglet)`);
+    if (k === null) throw new Error(`file not found: ${p} (open it in a tab first)`);
     return normalizeBrackets(blankLangLine(files[k]));
   },
   openSync: (p, mode) => {
     const fd = nextFd++;
     if (String(mode).startsWith('r')) {
       const k = resolve(p);
-      if (k === null) throw new Error(`fichier introuvable : ${p} (ouvre-le dans un onglet)`);
+      if (k === null) throw new Error(`file not found: ${p} (open it in a tab first)`);
       fds.set(fd, { data: Buffer.from(files[k], 'utf8'), pos: 0 });
     } else {
       fds.set(fd, { name: String(p).split(/[\\/]/).pop(), chunks: [] });
@@ -75,15 +75,15 @@ const fakeFs = {
   fsyncSync: () => {},
   unlinkSync: (p) => {
     const k = resolve(p);
-    if (k === null) throw new Error(`fichier introuvable : ${p}`);
+    if (k === null) throw new Error(`file not found: ${p}`);
     delete files[k];
   },
 };
 
-// ---------- Boucle d'évaluation persistante ----------
-// Le programme Scheme ci-dessous tourne en permanence : il se met en pause (suspend)
-// en attendant une expression, l'évalue dans l'environnement d'interaction et renvoie
-// le résultat. Les définitions restent donc disponibles dans la fenêtre d'interactions.
+// ---------- Persistent evaluation loop ----------
+// The Scheme program below runs forever: it pauses (suspend) waiting for an
+// expression, evaluates it in the interaction environment and returns the result.
+// Definitions therefore stay available in the interactions window.
 const BOOT = `
 (import (scheme base) (scheme eval) (scheme repl) (scheme write) (scheme read))
 (define %env (interaction-environment))
@@ -106,7 +106,7 @@ const STD_LIBS = ['(scheme base)', '(scheme write)', '(scheme read)', '(scheme c
   '(scheme inexact)', '(scheme case-lambda)', '(scheme lazy)', '(scheme eval)', '(scheme repl)',
   '(scheme file)', '(scheme time)', '(scheme load)'];
 
-// Quelques fonctions de Racket, seulement quand le fichier commence par #lang racket.
+// A few Racket functions, only when the file starts with #lang racket.
 const RACKET_COMPAT = `
 (define (add1 n) (+ n 1))
 (define (sub1 n) (- n 1))
@@ -169,18 +169,18 @@ function send(src) {
   try {
     r = step(() => itrp.resume(susp, create.String(src)));
   } catch (e) {
-    // Erreur JavaScript (ex. pile trop profonde) : on revient à l'état d'avant.
+    // JavaScript error (e.g. stack too deep): go back to the previous state.
     susp = saved;
     let msg = (e && e.message) || String(e);
-    if (/stack/i.test(msg)) msg = 'dépassement de la pile : récursion trop profonde (ou infinie ?)';
+    if (/stack/i.test(msg)) msg = 'stack overflow: recursion too deep (or infinite?)';
     return { ok: false, error: msg };
   }
-  if (r.done) return { ok: false, error: 'la session s\'est terminée (exit ?). Clique sur Exécuter.' };
+  if (r.done) return { ok: false, error: 'the session ended (exit?). Click Run.' };
   const parts = listItems(r.value);
   const tag = parts[0] && parts[0][1];
   if (tag === 'ok') return { ok: true, value: show(parts[1]) };
   if (tag === 'error') return { ok: false, error: errorMessage(parts[1]) };
-  return { ok: false, error: 'réponse inattendue de l\'interpréteur' };
+  return { ok: false, error: 'unexpected response from the interpreter' };
 }
 
 function listItems(obj) {
@@ -192,27 +192,18 @@ function show(obj) {
   try { return writeObject(obj); } catch { return '#<?>'; }
 }
 
-// Messages d'erreur du moteur (en anglais) traduits en français.
+// Engine error messages, rewritten to read more like DrRacket's.
 const TRANSLATIONS = [
-  [/^(.+) is not defined\.$/, (m) => `${m[1]} : identificateur non lié (il n'est pas défini)`],
-  [/^A <([\w-]+)> or <([\w-]+)> is expected\.$/, (m) => `contrat non respecté : on attendait ${typeName(m[1])} ou ${typeName(m[2])}`],
-  [/^A <([\w-]+)> is expected\.$/, (m) => `contrat non respecté : on attendait ${typeName(m[1])}`],
-  [/^An array of <([\w-]+)> is expected\.$/, (m) => `contrat non respecté : tous les arguments doivent être ${typeName(m[1], true)}`],
-  [/^Length of arguments does not match the length of parameters\.$/, () => 'mauvais nombre d\'arguments (ou forme spéciale mal écrite)'],
-  [/^Operator is not a valid procedure\.$/, () => 'application impossible : ce qui est en tête de la parenthèse n\'est pas une procédure'],
-  [/^Index is out of range\.$/, () => 'indice hors limites'],
-  [/^The specified string doesn't have character with index (\d+)\.$/, (m) => `indice hors limites : la chaîne n'a pas de caractère à l'indice ${m[1]}`],
-  [/^Specified list is shorter than specified number (\d+)$/, (m) => `la liste est trop courte pour l'indice ${m[1]}`],
+  [/^(.+) is not defined\.$/, (m) => `${m[1]}: undefined;\n cannot reference an identifier before its definition`],
+  [/^A <([\w-]+)> or <([\w-]+)> is expected\.$/, (m) => `contract violation\n  expected: ${m[1]}? or ${m[2]}?`],
+  [/^A <([\w-]+)> is expected\.$/, (m) => `contract violation\n  expected: ${m[1]}?`],
+  [/^An array of <([\w-]+)> is expected\.$/, (m) => `contract violation\n  expected: all arguments to be ${m[1]}?`],
+  [/^Length of arguments does not match the length of parameters\.$/, () => 'arity mismatch: wrong number of arguments (or a badly formed special form)'],
+  [/^Operator is not a valid procedure\.$/, () => 'application: not a procedure;\n expected a procedure that can be applied to arguments'],
+  [/^Index is out of range\.$/, () => 'index is out of range'],
+  [/^The specified string doesn't have character with index (\d+)\.$/, (m) => `string-ref: index is out of range\n  index: ${m[1]}`],
+  [/^Specified list is shorter than specified number (\d+)$/, (m) => `list-ref: index too large for list\n  index: ${m[1]}`],
 ];
-const TYPE_FR = {
-  pair: 'une paire', null: 'une liste vide', list: 'une liste', number: 'un nombre', string: 'une chaîne',
-  symbol: 'un symbole', procedure: 'une procédure', vector: 'un vecteur', character: 'un caractère',
-  boolean: 'un booléen', integer: 'un entier', record: 'un record', bytevector: 'un bytevector', port: 'un port',
-};
-const TYPES_FR = { number: 'des nombres', string: 'des chaînes', pair: 'des paires', character: 'des caractères', symbol: 'des symboles', list: 'des listes', vector: 'des vecteurs' };
-function typeName(t, plural) {
-  return plural ? (TYPES_FR[t] || `de type <${t}>`) : (TYPE_FR[t] || `<${t}>`);
-}
 function translate(msg) {
   for (const [re, f] of TRANSLATIONS) { const m = re.exec(msg); if (m) return f(m); }
   return msg;
@@ -221,13 +212,13 @@ function errorMessage(e) {
   if (Array.isArray(e) && e[0] === '<error>') {
     const [, type, message, irritants] = e;
     const irr = (irritants || []).map(show).join(' ');
-    if (type === 'division-by-zero') return 'division par zéro';
-    if (type === 'redefine-variable') return 'impossible de redéfinir cette variable ici';
+    if (type === 'division-by-zero') return '/: division by zero';
+    if (type === 'redefine-variable') return 'define: cannot redefine this variable here';
     let msg = message == null ? String(type).replace(/-/g, ' ') : String(message);
     if (type !== 'error') msg = translate(msg);
     return irr ? `${msg} ${irr}` : msg;
   }
-  return `exception levée (raise) : ${show(e)}`;
+  return `uncaught exception: ${show(e)}`;
 }
 
 function init(opts) {
@@ -237,7 +228,7 @@ function init(opts) {
   itrp.builtins.port['//error'].write = writeOut;
   step(() => itrp.eval(BOOT));
   for (const lib of STD_LIBS) send(`(import ${lib})`);
-  // Noms R5RS encore très utilisés dans les cours (présents dans DrRacket et Gauche).
+  // R5RS names still widely used in courses (available in DrRacket and Gauche).
   send('(define (exact->inexact x) (inexact x)) (define (inexact->exact x) (exact x))');
   if (opts.lang === 'racket') send(RACKET_COMPAT);
 }
